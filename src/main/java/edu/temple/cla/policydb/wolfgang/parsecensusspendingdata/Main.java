@@ -37,38 +37,55 @@ import java.io.FileReader;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.Statement;
+import java.util.StringJoiner;
 
 /**
- * This program parses the Public Use File from the U. S. Census.
- * Source of the data is http://www2.census.gov/govs/state/xxstate35.txt
- * where xx is the year.  Format of this data is described in
- * http://www.census.gov/govs/state/public_use_file_layout.html.
- * The data is inserted into the PAPolicy.BudgetData table. Only data for
- * Pennsylvania (government code 39) is inserted. Also only items with
- * a code of the form xnn where x is a single letter representing the
- * Object Code and nn is a two digit number representing the function code.
- * @author Paul Wolfgang
+ * This program parses the Public Use File from the U S Census.
+ *
+ * For the years 2000 through 2015 the data files are available at
+ * <a href="http://www2.census.gov/govs/state/xxstate35.txt">www2.census.gov/govs/state/xxstate35.txt</a> where xx is the year.
+ * Format of this data is described in
+ * <a href="https://www2.census.gov/programs-surveys/state/technical-documentation/file-layouts/public-use-file-layout.csv">www2.census.gov/programs-surveys/state/technical-documentation/file-layouts/public-use-file-layout.csv</a>
+ * These files contained only national and state level data.
+ *
+ * For 2016 and presumably beyond data is available at:
+ * <a href="https://www.census.gov/programs-surveys/gov-finances/data/datasets.html">www.census.gov/programs-surveys/gov-finances/data/datasets.html</a> The
+ * data is available in a zip file of the form: xxxx_Individual_Unit_file.zip.
+ * The data itself is in the file xxxxFinEstDAT_yyyyyyyymodp_pu.txt. The format
+ * of the file is described in xxxx S&amp;L Indiv Unit Data File Tech Doc.pdf. This
+ * file contains lower level government data as well as state level totals. xxxx
+ * represents the year.
+ *
+ * The program inserts the data into the BudgetData table. Only items with a
+ * code of the form xnn where x is the single letter representing the Object
+ * Code and nn is the two digit number representing the function code.
  */
 public class Main {
-    
-    private static final String PENNSYLVANIA = "39000000000000";
-    private static final String FIND_MAX_ID =
-            "select max(ID) from BudgetTable";
-    private static final String FIND_MAX_YEAR =
-            "select max(TheYear) from BudgetTable";
+
+    private static final String STATE_IDS = "000000000000";
+    private static final String FIND_MAX_ID
+            = "select max(ID) from BudgetTable";
+    private static final String FIND_MAX_YEAR
+            = "select max(TheYear) from BudgetTable";
 
     /**
      * Main method.
-     * @param args the command line arguments
-     * args[0] is the datasource
-     * args[1] is the name of the input file
-     * @throws java.lang.Exception
+     *
+     * @param args the command line arguments 
+     * <dl>
+     * <dt>args[0]</dt><dd>The DataSource parameters file</dd>
+     * <dt>args[1]</dt><dd>The input file name</dd>
+     * <dt>args[2]</dt><dd>The state code (two digit number)</dd>
+     * <dt>args[3]</dt><dd>The year (4 digit number) to determine the format</dd>
+     * </dl>
      */
-    public static void main(String[] args) throws Exception {
-        
+    public static void main(String[] args)  {
+
         SimpleDataSource dataSource = new SimpleDataSource(args[0]);
-        try (Connection connection = dataSource.getConnection(); 
-                Statement statement = connection.createStatement()) {
+        String stateID = args[2] + STATE_IDS;
+        try (Connection connection = dataSource.getConnection();
+                Statement statement = connection.createStatement();
+                BufferedReader in = new BufferedReader(new FileReader(args[1]))) {
             ResultSet rs = statement.executeQuery(FIND_MAX_YEAR);
             int maxYear;
             if (rs.next()) {
@@ -86,26 +103,32 @@ public class Main {
             }
             rs.close();
             System.out.printf("maxYear: %d, maxId: %d%n", maxYear, maxId);
-            BudgetData.setNextId(maxId+1);
+            BudgetData.setNextId(maxId + 1);
+            int year = Integer.parseInt(args[3]);
+            if (year > 2015) {
+                BudgetData.setBuidgetDataBuilder(new NewFormatBudgetDataBuilder());
+            } else {
+                BudgetData.setBuidgetDataBuilder(new OldFormatBudgetDataBuilder());
+            }
             StringBuilder insertStatement = new StringBuilder();
             insertStatement.append("insert into BudgetTable values\n");
-            BufferedReader in = new BufferedReader(new FileReader(args[1]));
+            StringJoiner values = new StringJoiner(",\n");
             String line;
             boolean first = true;
             while ((line = in.readLine()) != null) {
-                if (line.substring(0, 14).equals(PENNSYLVANIA)) {
+                if (line.substring(0, 14).equals(stateID)) {
                     BudgetData budgetData = BudgetData.parseLine(line);
                     if (budgetData != null && budgetData.getTheYear() > maxYear) {
-                        if (!first) insertStatement.append(",\n");
-                        else first = false;
-                        insertStatement.append(budgetData);
+                        values.add(budgetData.toString());
                     }
                 }
             }
+            insertStatement.append(values);
             System.out.println(insertStatement);
             statement.executeUpdate(insertStatement.toString());
+        } catch (Exception ex) {
+            throw new RuntimeException(ex);
         }
     }
-        
-    
+
 }

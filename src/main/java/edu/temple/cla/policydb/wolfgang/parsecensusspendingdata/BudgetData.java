@@ -31,6 +31,8 @@
  */
 package edu.temple.cla.policydb.wolfgang.parsecensusspendingdata;
 
+import java.util.Objects;
+
 /**
  * This class represents a row of the BudgetTable
  *
@@ -38,22 +40,25 @@ package edu.temple.cla.policydb.wolfgang.parsecensusspendingdata;
  */
 public class BudgetData {
 
-    private int id;             //The primary key
-    private String oc;          //The Object Code
-    private int fc;             //The Function Code
-    private String re;          //The real/exhibit flag
-    private int theYear;        //The year
-    private int theValue;       //The ammount in $1000 units
+    private int id;                   //The primary key
+    private final String oc;          //The Object Code
+    private final int fc;             //The Function Code
+    private final int theYear;        //The year
+    private final int theValue;       //The ammount in $1000 units
 
     private static int nextId; //The next id value to assign.
+    private static BudgetDataBuilder builder;
 
     /**
-     * Private constructor.
+     * Package Private constructor.
      */
-    private BudgetData() {
+    BudgetData(String oc, int fc, int theYear, int theValue) {
+        this.oc = oc;
+        this.fc = fc;
+        this.theYear = theYear;
+        this.theValue = theValue;
     }
 
-    ;
     
     /**
      * Method to set the initial nextId;
@@ -61,6 +66,14 @@ public class BudgetData {
      */
     public static void setNextId(int theNextId) {
         nextId = theNextId;
+    }
+    
+    /**
+     * Method to set the BudgeDataBuilder.
+     * @param theBuilder The BudgetDataBuilder
+     */
+    public static void setBuidgetDataBuilder(BudgetDataBuilder theBuilder) {
+        builder = theBuilder;
     }
 
     /**
@@ -72,41 +85,11 @@ public class BudgetData {
      * desired format.
      */
     public static BudgetData parseLine(String line) {
-        String itemCode;
-        String amount;
-        String dataYear;
-
-        itemCode = line.substring(14, 17);
-        amount = line.substring(17, 32).trim();
-        dataYear = line.substring(34, 36);
-        if (Character.isAlphabetic(itemCode.charAt(0))
-                && Character.isDigit(itemCode.charAt(1))
-                && Character.isDigit(itemCode.charAt(2))) {
-            BudgetData budgetData = new BudgetData();
-            try {
-                budgetData.id = nextId++;
-                budgetData.oc = Character.toString(itemCode.charAt(0));
-                budgetData.fc = Integer.parseInt(itemCode.substring(1, 3));
-                int year = Integer.parseInt(dataYear);
-                if (year > 70) {
-                    year += 1900;
-                } else {
-                    year += 2000;
-                }
-                budgetData.theYear = year;
-                if (amount.isEmpty()) {
-                    budgetData.theValue = 0;
-                } else {
-                    budgetData.theValue = Integer.parseInt(amount.trim());
-                }
-            } catch (Exception ex) {
-                System.err.println("Error parsing line: " + line);
-                throw ex;
-            }
-            return budgetData;
-        } else {
-            return null;
+        BudgetData budgetData = builder.parseLine(line);
+        if (budgetData != null) {
+            budgetData.id = ++nextId;
         }
+        return budgetData;
     }
 
     /**
@@ -117,49 +100,41 @@ public class BudgetData {
      */
     @Override
     public String toString() {
-        return String.format("(%d, '%s', %d, %s, %d, %d)", getId(), getOc(), getFc(), "NULL", getTheYear(), getTheValue());
+        return String.format("(%d, '%s', %d, %s, %d, %d)",
+                id, oc, fc, "NULL", theYear, theValue);
     }
-
+    
     /**
-     * @return the id
-     */
-    public int getId() {
-        return id;
-    }
-
-    /**
-     * @return the oc
-     */
-    public String getOc() {
-        return oc;
-    }
-
-    /**
-     * @return the fc
-     */
-    public int getFc() {
-        return fc;
-    }
-
-    /**
-     * @return the re
-     */
-    public String getRe() {
-        return re;
-    }
-
-    /**
-     * @return the theYear
+     * Return the year value.
+     * @return theYear
      */
     public int getTheYear() {
         return theYear;
     }
+    
+    @Override
+    public boolean equals (Object o) {
+        if (this == o) return true;
+        if (o == null) return false;
+        if (this.getClass() == o.getClass()) {
+            BudgetData other = (BudgetData) o;
+            return oc.equals(other.oc) &&
+                    fc == other.fc &&
+                    theYear == other.theYear &&
+                    theValue == other.theValue;            
+        } else {
+            return false;
+        }
+    }
 
-    /**
-     * @return the theValue
-     */
-    public int getTheValue() {
-        return theValue;
+    @Override
+    public int hashCode() {
+        int hash = 5;
+        hash = 59 * hash + Objects.hashCode(this.oc);
+        hash = 59 * hash + this.fc;
+        hash = 59 * hash + this.theYear;
+        hash = 59 * hash + this.theValue;
+        return hash;
     }
 
 }

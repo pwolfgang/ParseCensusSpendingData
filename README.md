@@ -17,7 +17,7 @@ The data itself is in the file xxxxFinEstDAT_yyyyyyyymodp_pu.txt. The format
 of the file is described in xxxx S&L Indiv Unit Data File Tech Doc.pdf. This file
 contains lower level government data as well as state level totals. xxxx represents the year.
 
-The program inserts the data into the BudgetData table.  Only itemd with a code
+The program inserts the data into the BudgetData table.  Only items with a code
 of the form xnn where x is the single letter representing the Object Code and nn
 is the two digit number representing the function code.
 
